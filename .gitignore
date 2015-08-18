@@ -1,3 +1,3 @@
 *~
 *.pyc
-client/magic_numbers.py
+src/magic_numbers.py
