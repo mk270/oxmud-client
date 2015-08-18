@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+# Archipelago, a multi-user dungeon (MUD) server, by Martin Keegan
+#
+# Copyright (C) 2009-2012  Martin Keegan
+#
+# This programme is free software; you may redistribute and/or modify
+# it under the terms of the GNU Affero General Public Licence as published by
+# the Free Software Foundation, either version 3 of said Licence, or
+# (at your option) any later version.
+
+import sys
+import wrap_curses
+
+from Multiplexer import Multiplexer
+from Networking import Socket, zap_cr
+from OxmudServerLink import OxmudServerLink as ServerLink
+from OxmudSplitScreen import OxmudSplitScreen
+from WebsocketSplitScreen import WebsocketSplitScreen
+
+server_address = ('localhost', 2091)
+
+
+class Stdin(Socket):
+    def __init__(self):
+        super(Stdin, self).__init__(sys.stdin, None)
+
+class SSFE(Stdin):
+    def __init__(self, ss=None, **kwargs):
+        super(SSFE, self).__init__()
+        self.ss = ss
+
+    def handleReadable(self):
+        self.ss.handle_input()
+
+
+def main(cls, *args):
+    ss = cls(*args)
+    ss.setup()
+    ss.write_prompt()
+
+    server = ServerLink(server_address, ss=ss)
+
+    if server.connection_failed:
+        return server.connection_failed
+
+    stdin = SSFE(ss=ss)
+
+    ss.set_server_link(server)
+
+    if not server.connection_failed:
+        m = Multiplexer()
+        m.addSocket(server)
+        m.addSocket(stdin)
+        m.run()
+    ss.shutdown()
+    return ""
+
+if __name__ == '__main__':
+    use_websocket = "--websocket" in sys.argv
+    if use_websocket:
+        main(WebsocketSplitScreen, *[])
+    else:
+        wrap_curses.run_alt(OxmudSplitScreen, main)
+
